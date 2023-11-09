@@ -25,7 +25,8 @@ def create_app():
 
     from models import Users
 
-    create_database(app)
+    with app.app_context():
+        db.create_all()
 
     login_manager = LoginManager()
     login_manager.init_app(app)
@@ -36,12 +37,6 @@ def create_app():
         return Users.query.get(int(user_id))
 
     return app
-
-
-def create_database(app):
-    if not path.exists(DB_NAME):
-        db.create_all(app=app)
-        print('Created Database!')
 
 
 if __name__ == '__main__':
