@@ -2,7 +2,7 @@ from flask_login import UserMixin
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField
 from wtforms.validators import InputRequired, Length, ValidationError
-from app import db
+from init import db
 
 
 class Users(db.Model, UserMixin):
