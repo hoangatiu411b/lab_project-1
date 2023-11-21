@@ -10,7 +10,7 @@ def create_app():
     app.register_blueprint(auth, url_prefix='/')
 
     from models import Users
-
+    
     login_manager.login_view = 'auth.login'
 
     with app.app_context():
