@@ -1,40 +1,70 @@
-from flask import Blueprint, render_template, redirect, url_for
-from models import Users, LoginForm, RegisterForm
-from init import db, bcrypt
-from flask_login import login_user, login_required, logout_user
+from app import db
+from flask import request, render_template, Blueprint, flash, redirect, url_for, session
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
+from models import User
 
 
-auth = Blueprint('auth', __name__)
+bp = Blueprint('auth', __name__, url_prefix='/auth')
 
 
-@auth.route('/login', methods=['GET', 'POST'])
-def login():
-    form = LoginForm()
-    if form.validate_on_submit():
-        user = Users.query.filter_by(username=form.username.data).first()
-        if user:
-            if bcrypt.check_password_hash(user.password, form.password.data):
-                login_user(user)
-                return redirect(url_for('views.success'))
-    return render_template('login.html', form=form)
-
-
-@auth.route('/logout', methods=['GET', 'POST'])
-@login_required
-def logout():
-    logout_user()
-    return redirect(url_for('auth.login'))
-
-
-@auth.route('/register', methods=['GET', 'POST'])
+@bp.route("/register", methods=('GET', 'POST'))
 def register():
-    form = RegisterForm()
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        error = None
 
-    if form.validate_on_submit():
-        hashed_password = bcrypt.generate_password_hash(form.password.data)
-        new_user = Users(username=form.username.data, password=hashed_password)
-        db.session.add(new_user)
-        db.session.commit()
-        return redirect(url_for('auth.login'))
+        if username and password:
+            existing_user = db.session.execute(db.select(User).where(User.username == username)).first()
+            if existing_user:
+                error = f"Username {username} already exist"
+            else: 
+                user = User(
+                    username = username,
+                    password = generate_password_hash(password)
+                )
+                db.session.add(user)
+                db.session.commit()
+                return redirect(url_for('auth.login'))
 
-    return render_template('register.html', form=form)
+        flash(error)
+
+    return render_template('auth/register.html')
+ 
+
+@bp.route("/login", methods=('GET', 'POST'))
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        error = None
+
+        user = db.session.execute(db.select(User).filter_by(username = username)).scalar_one()
+        if user is None:
+            error =  f"Username {username} not found"
+        else:
+            if check_password_hash(user.password, password):
+                session['username'] = username
+                return redirect(url_for('views.success'))
+            else:
+                error =  f"Check your credentials"
+        flash(error)
+
+    return render_template('auth/login.html')
+
+
+@bp.route('/logout', methods=['GET', 'POST'])
+def logout():
+    session.pop('username', None)
+    return redirect(url_for('index'))
+
+
+def login_required(func):
+    @wraps(func)
+    def decorated_view(*args, **kwargs):
+        if not "username" in session.keys():
+            return redirect(url_for('index'))
+        return func(*args, **kwargs)
+
+    return decorated_view

@@ -1,28 +1,30 @@
-from os import path
-from init import app, login_manager, db 
-
-def create_app():
-
-    from views import views
-    from auth import auth
-
-    app.register_blueprint(views, url_prefix='/')
-    app.register_blueprint(auth, url_prefix='/')
-
-    from models import Users
-    
-    login_manager.login_view = 'auth.login'
-
-    with app.app_context():
-        db.create_all()
-
-    @login_manager.user_loader
-    def load_user(user_id):
-        return Users.query.get(int(user_id))
-    
-    return app
+import os
+import secrets
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+from utils import get_postgres_database_uri
 
 
-if __name__ == '__main__':
-    app = create_app()
-    app.run(host="0.0.0.0")
+app = Flask(__name__)
+db = SQLAlchemy()
+
+if "SQL_DATABASE_TYPE" in os.environ and os.environ["SQL_DATABASE_TYPE"] == "postgres":
+    app.config["SQLALCHEMY_DATABASE_URI"] = get_postgres_database_uri()
+else:
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///project.db"
+
+app.config["SECRET_KEY"] = secrets.token_hex()
+
+db.init_app(app)
+
+import models
+
+with app.app_context():
+    db.create_all()
+
+import auth
+app.register_blueprint(auth.bp)
+
+import views
+app.register_blueprint(views.bp)
+app.add_url_rule('/', endpoint='index')
