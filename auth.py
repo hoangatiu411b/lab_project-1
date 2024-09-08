@@ -40,15 +40,17 @@ def login():
         password = request.form['password']
         error = None
 
-        user = db.session.execute(db.select(User).filter_by(username = username)).scalar_one()
-        if user is None:
-            error =  f"Username {username} not found"
-        else:
+        user = db.session.execute(db.select(User).where(User.username == username)).scalar_one_or_none()
+
+        if user:
             if check_password_hash(user.password, password):
                 session['username'] = username
                 return redirect(url_for('views.success'))
             else:
-                error =  f"Check your credentials"
+                error = "Check your credentials"
+        else:
+            error = "User does not exist"
+
         flash(error)
 
     return render_template('auth/login.html')
